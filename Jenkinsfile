@@ -3,57 +3,50 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
 
-                echo 'Source code checked out successfully.'
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/Adityamahamuni07/jenkins-maven-demo.git'
             }
         }
 
-        stage('Check Project') {
+        stage('Build') {
             steps {
-                sh '''
-                    echo "Checking Maven project..."
-                    pwd
-                    ls -la
-                    test -f pom.xml
-                '''
+                sh 'mvn clean compile'
             }
         }
 
-        stage('Build and Test') {
+        stage('Run Tests') {
             steps {
-                sh 'mvn -B clean package'
+                sh 'mvn test'
             }
         }
 
-        stage('Verify Artifact') {
+        stage('Publish Test Results') {
             steps {
-                sh '''
-                    echo "Checking generated JAR..."
-                    ls -lh target/
-                    find target -maxdepth 1 -name "*.jar" -type f
-                '''
+                junit testResults: 'target/surefire-reports/*.xml'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package'
             }
         }
     }
 
     post {
         always {
-            junit testResults: 'target/surefire-reports/*.xml',
-                  allowEmptyResults: false
+            echo 'Jenkins pipeline execution completed.'
         }
 
         success {
-            archiveArtifacts artifacts: 'target/*.jar',
-                             fingerprint: true
-
-            echo 'Build, tests, and artifact archiving completed!'
+            echo 'Build and tests completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output and test reports.'
+            echo 'Build or test execution failed.'
         }
     }
 }
