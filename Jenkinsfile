@@ -5,9 +5,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    credentialsId: 'github-token',
-                    url: 'https://github.com/Adityamahamuni07/jenkins-maven-demo.git'
+                checkout scm
+
+                echo 'Source code checked out successfully.'
             }
         }
 
@@ -15,22 +15,24 @@ pipeline {
             steps {
                 sh '''
                     echo "Checking Maven project..."
+                    pwd
                     ls -la
                     test -f pom.xml
                 '''
             }
         }
 
-        stage('Build') {
+        stage('Build and Test') {
             steps {
                 sh 'mvn -B clean package'
             }
         }
 
-        stage('Verify') {
+        stage('Verify Artifact') {
             steps {
                 sh '''
-                    echo "Generated artifacts:"
+                    echo "Checking generated JAR..."
+                    ls -lh target/
                     find target -maxdepth 1 -name "*.jar" -type f
                 '''
             }
@@ -38,12 +40,20 @@ pipeline {
     }
 
     post {
+        always {
+            junit testResults: 'target/surefire-reports/*.xml',
+                  allowEmptyResults: false
+        }
+
         success {
-            echo 'Webhook-triggered build completed successfully!'
+            archiveArtifacts artifacts: 'target/*.jar',
+                             fingerprint: true
+
+            echo 'Build, tests, and artifact archiving completed!'
         }
 
         failure {
-            echo 'Build failed. Check Console Output.'
+            echo 'Pipeline failed. Check Console Output and test reports.'
         }
     }
 }
