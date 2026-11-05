@@ -1,59 +1,25 @@
-
 pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
 
-                echo 'Source code checked out successfully.'
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/Adityamahamuni07/jenkins-maven-demo.git'
             }
         }
 
-        stage('Check Project') {
+        stage('Build') {
             steps {
-                sh '''
-                    echo "Checking Maven project..."
-                    pwd
-                    ls -la
-                    test -f pom.xml
-                '''
+                sh 'mvn clean package'
             }
         }
 
-        stage('Build and Test') {
+        stage('Test Results') {
             steps {
-                sh 'mvn -B clean package'
+                junit 'target/surefire-reports/*.xml'
             }
-        }
-
-        stage('Verify Artifact') {
-            steps {
-                sh '''
-                    echo "Checking generated JAR..."
-                    ls -lh target/
-                    find target -maxdepth 1 -name "*.jar" -type f
-                '''
-            }
-        }
-    }
-
-    post {
-        always {
-            junit testResults: 'target/surefire-reports/*.xml',
-                  allowEmptyResults: false
-        }
-
-        success {
-            archiveArtifacts artifacts: 'target/*.jar',
-                             fingerprint: true
-
-            echo 'Build, tests, and artifact archiving completed!'
-        }
-
-        failure {
-            echo 'Pipeline failed. Check Console Output and test reports.'
         }
     }
 }
