@@ -5,33 +5,55 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/Adityamahamuni07/jenkins-maven-demo.git'
+                checkout scm
+
+                echo 'Source code checked out successfully.'
             }
         }
 
-        stage('Build') {
+        stage('Check Project') {
             steps {
-                sh 'mvn clean compile'
+                sh '''
+                    echo "Checking Maven project..."
+                    pwd
+                    ls -la
+                    test -f pom.xml
+                '''
             }
         }
 
-        stage('Test') {
+        stage('Build and Test') {
             steps {
-                sh 'mvn test'
+                sh 'mvn -B clean package'
             }
         }
 
-        stage('Publish Test Results') {
+        stage('Verify Artifact') {
             steps {
-                junit 'target/surefire-reports/*.xml'
+                sh '''
+                    echo "Checking generated JAR..."
+                    ls -lh target/
+                    find target -maxdepth 1 -name "*.jar" -type f
+                '''
             }
         }
+    }
 
-        stage('Package') {
-            steps {
-                sh 'mvn package'
-            }
+    post {
+        always {
+            junit testResults: 'target/surefire-reports/*.xml',
+                  allowEmptyResults: false
+        }
+
+        success {
+            archiveArtifacts artifacts: 'target/*.jar',
+                             fingerprint: true
+
+            echo 'Build, tests, and artifact archiving completed!'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check Console Output and test reports.'
         }
     }
 }
