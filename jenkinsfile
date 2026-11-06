@@ -1,0 +1,7 @@
+stage('GitHub Checkout') {
+    steps {
+        git branch: 'main',
+            credentialsId: 'github-token',
+            url: 'https://github.com/Adityamahamuni07/jenkins-maven-demo.git'
+    }
+}
