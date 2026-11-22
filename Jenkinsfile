@@ -3,30 +3,42 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'aditya-java-app'
+        APP_NAME = 'jenkins-maven-demo'
+        DOCKERHUB_USERNAME = 'YOUR_DOCKERHUB_USERNAME'
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
-
-        stage('Git Checkout') {
+        stage('Checkout') {
             steps {
-                echo 'Downloading source code'
                 checkout scm
+
+                echo 'Source code checked out successfully.'
             }
         }
 
         stage('Maven Build') {
             steps {
-                echo 'Building Java application'
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn -B clean package'
             }
         }
 
-        stage('Docker Build') {
+        stage('Verify JAR') {
             steps {
-                echo 'Building Docker image'
                 sh '''
-                    docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                    echo "Checking generated JAR..."
+                    ls -lh target/
+                    test -n "$(find target -maxdepth 1 -name "*.jar" -type f)"
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build \
+                        -t ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG} \
+                        .
                 '''
             }
         }
@@ -37,18 +49,18 @@ pipeline {
                     usernamePassword(
                         credentialsId: 'dockerhub-creds',
                         usernameVariable: 'DOCKER_USER',
-                        passwordVariable:'DOCKER_TOKEN'
+                        passwordVariable: 'DOCKER_TOKEN'
                     )
                 ]) {
                     sh '''
-                        echo "$DOCKER_TOKEN" | docker login \
-                        -u "$DOCKER_USER" --password-stdin
+                        set +x
 
-                        docker tag ${IMAGE_NAME}:${BUILD_NUMBER} \
-                        "$DOCKER_USER/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        echo "$DOCKER_TOKEN" | docker login \
+                            --username "$aditya9023" \
+                            --password-stdin
 
                         docker push \
-                        "$DOCKER_USER/${IMAGE_NAME}:${BUILD_NUMBER}"
+                            ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}
 
                         docker logout
                     '''
@@ -56,22 +68,24 @@ pipeline {
             }
         }
 
-        stage('Verify Docker Image') {
+        stage('Verify Image') {
             steps {
-                echo 'Checking Docker images'
-                sh 'docker images'
+                sh '''
+                    docker images
+                    echo "Image pushed to Docker Hub:"
+                    echo "${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}"
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Docker image successfully pushed to Docker Hub!'
+            echo 'SUCCESS: Docker image pushed to Docker Hub!'
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output.'
+            echo 'FAILURE: Check Console Output.'
         }
     }
 }
-
