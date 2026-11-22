@@ -3,75 +3,73 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'jenkins-maven-demo'
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_NAME = 'aditya-java-app'
+        CONTAINER_NAME = 'aditya-java-container'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
 
-                echo 'Source code checked out.'
+        stage('Git Checkout') {
+            steps {
+                echo 'Downloading source code from GitHub'
+                checkout scm
             }
         }
 
         stage('Maven Build') {
             steps {
-                sh 'mvn -B clean package'
+                echo 'Building Java application'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Verify JAR') {
+        stage('Check JAR') {
+            steps {
+                sh 'ls -lh target/*.jar'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Docker Image List') {
+            steps {
+                sh 'docker images'
+            }
+        }
+
+        stage('Deploy Container') {
             steps {
                 sh '''
-                    echo "Checking generated JAR..."
-                    ls -lh target/
-                    test -n "$(find target -maxdepth 1 -name "*.jar" -type f)"
+                    docker rm -f ${CONTAINER_NAME} || true
+
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 8081:8080 \
+                      ${IMAGE_NAME}:${BUILD_NUMBER}
                 '''
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Verify Container') {
             steps {
-                sh '''
-                    docker build \
-                        -t ${APP_NAME}:${IMAGE_TAG} \
-                        .
-                '''
-            }
-        }
-
-        stage('Verify Docker Image') {
-            steps {
-                sh '''
-                    docker images
-                    docker image inspect ${APP_NAME}:${IMAGE_TAG}
-                '''
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                sh '''
-                    docker run --rm ${APP_NAME}:${IMAGE_TAG}
-                '''
+                sh 'docker ps'
             }
         }
     }
 
     post {
-        always {
-            junit testResults: 'target/surefire-reports/*.xml',
-                  allowEmptyResults: true
-        }
-
         success {
-            echo 'Maven build and Docker image creation completed!'
+            echo 'Docker integration completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output.'
+            echo 'Pipeline failed. Check Jenkins console output.'
         }
     }
 }
+
