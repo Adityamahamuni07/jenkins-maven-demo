@@ -38,7 +38,7 @@ pipeline {
                         ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
                         'sudo docker run -d \
                         --name jenkins-demo \
-                        -p 8080:8080 \
+                        -p 8081:8080 \
                         ${IMAGE}:latest'
                     """
                 }
