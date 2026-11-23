@@ -5,7 +5,7 @@ pipeline {
     environment {
         IMAGE = 'aditya9023/aditya20'
         DEPLOY_HOST = '43.205.209.230'
-        DEPLOY_USER = 'aditya9023'
+        DEPLOY_USER = 'ec2-user'
     }
 
     stages {
