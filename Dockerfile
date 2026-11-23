@@ -1,10 +1,11 @@
+FROM alpine:latest
 
-FROM eclipse-temurin:17-jre
+LABEL maintainer="Aditya"
+
+RUN apk update && apk add --no-cache curl
 
 WORKDIR /app
 
-COPY target/jenkins-demo-1.0.jar app.jar
+RUN echo "Hello Aditya! This is my custom Alpine Docker image." > index.html
 
-EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["cat", "index.html"]
