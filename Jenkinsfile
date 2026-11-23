@@ -3,89 +3,58 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'jenkins-maven-demo'
-        DOCKERHUB_USERNAME = 'YOUR_DOCKERHUB_USERNAME'
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE = 'aditya9023/aditya20'
+        DEPLOY_HOST = '43.205.209.230'
+        DEPLOY_USER = 'aditya9023'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Pull Docker Image') {
             steps {
-                checkout scm
-
-                echo 'Source code checked out successfully.'
-            }
-        }
-
-        stage('Maven Build') {
-            steps {
-                sh 'mvn -B clean package'
-            }
-        }
-
-        stage('Verify JAR') {
-            steps {
-                sh '''
-                    echo "Checking generated JAR..."
-                    ls -lh target/
-                    test -n "$(find target -maxdepth 1 -name "*.jar" -type f)"
-                '''
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                    docker build \
-                        -t ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG} \
-                        .
-                '''
-            }
-        }
-
-        stage('Docker Hub Login and Push') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'aditya9023',
-                        passwordVariable: 'DOCKER_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-
-                        echo "$DOCKER_TOKEN" | docker login \
-                            --username "$aditya9023" \
-                            --password-stdin
-
-                        docker push \
-                            ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}
-
-                        docker logout
-                    '''
+                sshagent(credentials: ['deploy-ec2-key']) {
+                    sh """
+                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
+                        'sudo docker pull ${IMAGE}:latest'
+                    """
                 }
             }
         }
 
-        stage('Verify Image') {
+        stage('Stop Old Container') {
             steps {
-                sh '''
-                    docker images
-                    echo "Image pushed to Docker Hub:"
-                    echo "${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}"
-                '''
+                sshagent(credentials: ['deploy-ec2-key']) {
+                    sh """
+                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
+                        'sudo docker rm -f jenkins-demo || true'
+                    """
+                }
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                sshagent(credentials: ['deploy-ec2-key']) {
+                    sh """
+                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
+                        'sudo docker run -d \
+                        --name jenkins-demo \
+                        -p 8080:8080 \
+                        ${IMAGE}:latest'
+                    """
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sshagent(credentials: ['deploy-ec2-key']) {
+                    sh """
+                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
+                        'sudo docker ps'
+                    """
+                }
             }
         }
     }
-
-    post {
-        success {
-            echo 'SUCCESS: Docker image pushed to Docker Hub!'
-        }
-
-        failure {
-            echo 'FAILURE: Check Console Output.'
-        }
-    }
 }
+
