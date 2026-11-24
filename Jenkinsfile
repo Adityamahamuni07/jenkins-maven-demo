@@ -1,34 +1,47 @@
 
 pipeline {
-    agent {
-        label 'linux-agent'
-    }
+    agent any
 
     stages {
 
-        stage('Check Agent') {
+        stage('Build') {
             steps {
-                sh 'hostname'
-                sh 'whoami'
+                echo 'Building Java application...'
+                sh 'echo Maven Build Successful'
             }
         }
 
-        stage('Check Java') {
+        stage('Test') {
             steps {
-                sh 'java -version'
+                echo 'Running unit tests...'
+                sh 'echo All Tests Passed'
             }
         }
 
-        stage('Check Disk') {
+        stage('Docker Build') {
             steps {
-                sh 'df -h'
+                echo 'Building Docker image...'
+                sh 'echo Docker Image Created'
             }
         }
 
-        stage('Check Workspace') {
+        stage('Production Approval') {
             steps {
-                sh 'pwd'
-                sh 'ls -la'
+                timeout(time: 5, unit: 'MINUTES') {
+                    input(
+                        id: 'productionApproval',
+                        message: 'Do you approve Production deployment?',
+                        ok: 'Deploy to Production',
+                        submitter: 'ec2-user'
+                    )
+                }
+            }
+        }
+
+        stage('Production Deployment') {
+            steps {
+                echo 'Deploying application to Production...'
+                sh 'echo Production Deployment Successful'
             }
         }
     }
