@@ -2,59 +2,107 @@
 pipeline {
     agent any
 
-    environment {
-        IMAGE = 'aditya9023/aditya20'
-        DEPLOY_HOST = '43.205.209.230'
-        DEPLOY_USER = 'ec2-user'
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'production'],
+            description: 'Select deployment environment'
+        )
+
+        string(
+            name: 'APP_NAME',
+            defaultValue: 'my-java-app',
+            description: 'Enter application name'
+        )
+
+        booleanParam(
+            name: 'RUN_TESTS',
+            defaultValue: true,
+            description: 'Run application tests?'
+        )
+
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '1.0',
+            description: 'Enter application version'
+        )
     }
 
     stages {
-        stage('Pull Docker Image') {
+
+        stage('Display Parameters') {
             steps {
-                sshagent(credentials: ['deploy-ec2-key']) {
-                    sh """
-                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
-                        'sudo docker pull ${IMAGE}:latest'
-                    """
-                }
+                echo "Environment: ${params.ENVIRONMENT}"
+                echo "Application: ${params.APP_NAME}"
+                echo "Version: ${params.APP_VERSION}"
+                echo "Run Tests: ${params.RUN_TESTS}"
             }
         }
 
-        stage('Stop Old Container') {
+        stage('Build') {
             steps {
-                sshagent(credentials: ['deploy-ec2-key']) {
-                    sh """
-                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
-                        'sudo docker rm -f jenkins-demo || true'
-                    """
-                }
+                echo "Building ${params.APP_NAME}"
+                echo "Version: ${params.APP_VERSION}"
             }
         }
 
-        stage('Run New Container') {
-            steps {
-                sshagent(credentials: ['deploy-ec2-key']) {
-                    sh """
-                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
-                        'sudo docker run -d \
-                        --name jenkins-demo \
-                        -p 8081:8080 \
-                        ${IMAGE}:latest'
-                    """
+        stage('Test') {
+            when {
+                expression {
+                    params.RUN_TESTS == true
                 }
+            }
+
+            steps {
+                echo 'Running application tests...'
+                sh 'echo Tests completed successfully'
             }
         }
 
-        stage('Verify Deployment') {
-            steps {
-                sshagent(credentials: ['deploy-ec2-key']) {
-                    sh """
-                        ssh ${DEPLOY_USER}@${DEPLOY_HOST} \
-                        'sudo docker ps'
-                    """
+        stage('Development Deployment') {
+            when {
+                expression {
+                    params.ENVIRONMENT == 'dev'
                 }
+            }
+
+            steps {
+                echo 'Deploying to Development Environment'
+            }
+        }
+
+        stage('Staging Deployment') {
+            when {
+                expression {
+                    params.ENVIRONMENT == 'staging'
+                }
+            }
+
+            steps {
+                echo 'Deploying to Staging Environment'
+            }
+        }
+
+        stage('Production Deployment') {
+            when {
+                expression {
+                    params.ENVIRONMENT == 'production'
+                }
+            }
+
+            steps {
+                echo 'Deploying to Production Environment'
             }
         }
     }
-}
 
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
